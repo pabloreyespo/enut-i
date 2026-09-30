@@ -4,7 +4,7 @@
 #SBATCH -p general
 #SBATCH -n 1
 #SBATCH --ntasks-per-node=1
-#SBATCH -c 20
+#SBATCH -c 10
 #SBATCH --mem-per-cpu=3000
 #SBATCH --mail-user=pareyes2018@udec.cl
 #SBATCH --mail-type=ALL
@@ -31,7 +31,7 @@ if [ "${RUN_TWINS:-0}" = "1" ] || [ ! -f data/raw/matriz_gemelos.csv.gzip ]; the
   ml intel/2022.00
   ml Python/3.12.3
   source enut-env/bin/activate
-  TWIN_WORKERS=${SLURM_CPUS_PER_TASK:-20} python data_processing/gemelos_matriz.py
+  TWIN_WORKERS=${SLURM_CPUS_PER_TASK:-10} python data_processing/gemelos_matriz.py
   deactivate
   ml purge
   module load r/4.4.0
