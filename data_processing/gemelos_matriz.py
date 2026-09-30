@@ -1,35 +1,40 @@
 import polars as pl
 import numpy as np
-import pandas as pd
 from multiprocessing import Pool
 from tqdm import tqdm
-from cvxpy import Minimize, Variable, Problem, SCS, ECOS, quad_form, diag, sqrt, norm
+from cvxpy import Minimize, Variable, Problem, ECOS, norm
+import gzip
+import os
 import warnings
 warnings.filterwarnings("ignore")
 
 def minim(i):
-    global sh_data, sh_covinv, sh_Q, sh_mu
+    global sh_data, sh_covinv, sh_Q
     mask = sh_data[:,0] != sh_data[i,0]
     XNi = sh_data[i,1:]
     XM  = sh_data[mask,1:]
 
-    temp = (XNi - XM).T
+    # Mahalanobis distance of every donor to individual i. This equals
+    # diag(quad_form((XNi - XM).T, covinv)) without building the dense
+    # (n - 1) x (n - 1) matrix.
+    diff = XM - XNi
+    dist = np.sqrt(np.einsum("ij,jk,ik->i", diff, sh_covinv, diff))
     x = Variable(mask.sum() , name = "x")
 
-    obj = Minimize(norm(((XNi - x @ XM)@sh_Q).T)+ x @ sqrt(diag(quad_form(temp, sh_covinv))))
+    obj = Minimize(norm(((XNi - x @ XM)@sh_Q).T)+ x @ dist)
     constr  = [x >= 0, x <= 1, sum(x) == 1]
 
     val = Problem(obj, constr).solve(solver =  ECOS,verbose = False)
     out = x.value.clip(min=0).round(5)
-    sh_mu[i, mask] = out
-    return i, sh_mu[i]
+    row = np.zeros(len(sh_data), dtype=np.float32)
+    row[mask] = out
+    return i, row
 
-def init_worker(data, covinv, Q, mu):
-    global sh_data, sh_covinv, sh_Q, sh_mu
+def init_worker(data, covinv, Q):
+    global sh_data, sh_covinv, sh_Q
     sh_data = data
     sh_covinv  = covinv
     sh_Q  = Q
-    sh_mu  = mu
 
 if __name__ == "__main__":
 
@@ -70,21 +75,16 @@ if __name__ == "__main__":
     Q = np.linalg.cholesky(covinv)
 
     n = len(data)
-    mu = np.zeros((n,n))
-    with Pool(10, initializer = init_worker, initargs = (data, covinv, Q, mu, )) as p:
-        r = list(tqdm(p.imap(minim, range(n)), total=n))
+    mu = np.zeros((n,n), dtype=np.float32)
+    workers = int(os.environ.get("TWIN_WORKERS", os.cpu_count()))
+    with Pool(workers, initializer = init_worker, initargs = (data, covinv, Q, )) as p:
+        for i, vec in tqdm(p.imap(minim, range(n), chunksize = 8), total=n):
+            mu[i] = vec
 
-    for i, vec in r:
-        mu[i] = vec
-
-    df = pd.DataFrame(mu)
-    df.to_csv(
-        "data/raw/matriz_gemelos.csv.gzip",
-        header = False,
-        index = False,
-        compression = "gzip",
-        float_format='%.4f'
-    )
+    # Same headerless %.4f CSV as before, streamed in blocks to bound memory.
+    with gzip.open("data/raw/matriz_gemelos.csv.gzip", "wt") as out:
+        for start in range(0, n, 500):
+            np.savetxt(out, mu[start:start + 500], fmt="%.4f", delimiter=",")
 
     # for i in tqdm(range(n)):
     #     minim(i)

@@ -62,6 +62,9 @@ data_outliers <- data_outliers %>% dplyr::select(
 haven::write_dta(data_outliers %>% arrange(id_persona), "data/raw/ENUT_PRE_WEEKEND_IMPUTATION.dta")
 write_csv(data_outliers %>% arrange(id_persona), "data/raw/ENUT_PRE_WEEKEND_IMPUTATION.csv")
 data <- haven::read_dta("data/raw/ENUT_PRE_WEEKEND_IMPUTATION.dta") %>% arrange(id_persona)
+# Rscript data_processing/data_processing.R --pre stops here so the twin matrix
+# can be rebuilt from ENUT_PRE_WEEKEND_IMPUTATION.csv (steps.md, step 3).
+if ("--pre" %in% commandArgs(trailingOnly = TRUE)) quit(save = "no")
 # ------------------------------------------------------------------------------
 
 twin_matrix <- read_csv("data/raw/matriz_gemelos.csv.gzip", col_names = F)

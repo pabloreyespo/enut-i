@@ -7,7 +7,8 @@
 #' de Presupuestos Familiares (EPF). Used as the primary input for structural time-use
 #' models via \code{get_data()} and \code{get_data_tc()}.
 #'
-#' All income and expenditure variables are expressed in weekly thousands of Chilean pesos.
+#' All income and expenditure variables are expressed in weekly thousands of nominal Chilean
+#' pesos of 2015 (monthly amounts divided by 1000 and by 4; EPF VIII expenditures divided by 1.025).
 #' Time variables are expressed in weekly hours, normalized to sum to 168.
 #'
 #' \describe{
@@ -24,7 +25,7 @@
 #'   \item{n_menores_0_4}{Number of household members aged 0 to 4}
 #'   \item{n_menores_5_14}{Number of household members aged 5 to 14}
 #'   \item{n_nna}{Number of household members aged 0 to 14}
-#'   \item{n_menores_18}{Number of household members aged 0 to 18}
+#'   \item{n_menores_18}{Number of household members under 18, capped at 4}
 #'   \item{n_personas_15_65}{Number of household members aged 15 to 65}
 #'   \item{n_mayores}{Number of adult household members (18+)}
 #'   \item{n_tiempo}{Number of household members who reported time use}
@@ -83,23 +84,29 @@
 #'   \item{t_unpaid_voluntary}{Trabajo voluntario y ayuda a otros hogares; suma de t_tvaoh_tv +
 #'     t_tvaoh_oh, horas semanales}
 #'   \item{t_education}{Educacion y formacion; equivale a t_ed, horas semanales}
-#'   \item{t_leisure}{Ocio; suma de t_vsyo_csar + t_vsyo_aa + t_mcm_leer + t_mcm_video +
-#'     t_mcm_audio + t_mcm_computador, horas semanales}
+#'   \item{t_leisure}{Ocio; suma de t_vsyo_csar + t_vsyo_ev + t_vsyo_aa + t_vsyo_dep + t_mcm_leer +
+#'     t_mcm_video + t_mcm_audio + t_mcm_computador, horas semanales}
+#'   \item{t_rest}{Descanso; equivale a t_descanso. Not asked in ENUT I, always 0 (ENUT II item vs11)}
 #'   \item{t_personal_care}{Cuidados personales fisiologicos (excluye sueno y comidas); equivale
 #'     a t_cpaf_cp, horas semanales}
 #'   \item{t_meals}{Comer y beber; equivale a t_cpag_comer, horas semanales}
 #'   \item{t_sleep}{Dormir; equivale a t_cpag_dormir, ajustado para que la suma sea 168 horas,
 #'     horas semanales}
-#'   \item{t_commute1}{Traslados asociados a trabajo remunerado, educacion y salud; equivale a
-#'     t_tt1, horas semanales}
+#'   \item{t_commute}{Traslados asociados a trabajo remunerado, educacion y salud; equivale a
+#'     t_tt1, horas semanales. ENUT I only asks these three commutes}
 #'
 #'   \item{Tw}{Paid work time (equivalent to t_to / t_paid_work)}
-#'   \item{Tf_social}{Social life and recreation time (equivalent to t_vsyo_csar)}
-#'   \item{Tf_hobbies}{Hobbies and arts time (equivalent to t_vsyo_aa)}
+#'   \item{Tf_social}{Social life time: conversation with friends or family and civic or religious
+#'     celebrations (equivalent to t_vsyo_csar)}
+#'   \item{Tf_events}{Cinema, theatre, concerts and sports events (equivalent to t_vsyo_ev)}
+#'   \item{Tf_hobbies}{Hobbies and arts time: music, dance, writing, board or video games
+#'     (equivalent to t_vsyo_aa)}
+#'   \item{Tf_sports}{Sports and exercise time (equivalent to t_vsyo_dep)}
 #'   \item{Tf_read}{Reading time (equivalent to t_mcm_leer)}
 #'   \item{Tf_listen}{Audio consumption time (equivalent to t_mcm_audio)}
 #'   \item{Tf_watch}{TV and video consumption time (equivalent to t_mcm_video)}
 #'   \item{Tf_computer}{Recreational computer/internet use time (equivalent to t_mcm_computador)}
+#'   \item{Tf_rest}{Resting (equivalent to t_descanso); always 0 in ENUT I}
 #'   \item{Tc_meals}{Time spent eating and drinking (equivalent to t_cpag_comer)}
 #'   \item{Tc_sleep}{Time spent sleeping, adjusted to balance 168 hours (equivalent to t_cpag_dormir)}
 #'   \item{Tc_other}{All other time use (job search, domestic work, care, personal care,
@@ -139,10 +146,11 @@
 #' \code{enut_i_raw}. See \code{agregar_actividades()} in
 #' \code{data_processing/processing_functions.R} for the exact aggregation mapping.
 #'
-#' Compared to ENUT II, this dataset includes \code{t_job_search} as a separate activity
-#' category (absent in ENUT II) and a single commute category (\code{t_commute1}) since
-#' ENUT I does not distinguish a second commute type. \code{Tc_other} therefore also
-#' absorbs job search time.
+#' The aggregated variables have the same names and definitions as \code{enut_ii}. Two
+#' differences come from the questionnaires: ENUT I asks only work, health and education
+#' commutes (ENUT II asks eight), and ENUT I has no rest item, so \code{t_rest} and
+#' \code{Tf_rest} are 0 and rest time is spread over the other activities by the 168
+#' hour rescaling. \code{Tc_other} includes job search time in both surveys.
 #'
 #' @source <https://www.ine.gob.cl/enut>
 #' @source <https://www.ine.gob.cl/estadisticas/sociales/ingresos-y-gastos/encuesta-de-presupuestos-familiares>

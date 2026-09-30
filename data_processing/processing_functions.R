@@ -28,8 +28,11 @@ acts_corregidas <- c(
     "t_cpag_comer",
     "t_cpag_dormir",
     "t_ed",
-    "t_vsyo_csar", # convivencia social y actividades recreativas
-    "t_vsyo_aa", # arte y aficiones
+    "t_vsyo_csar", # convivencia social (s11) y celebraciones civicas o religiosas (s22)
+    "t_vsyo_ev", # cine, teatro, conciertos (s21) y eventos deportivos (s23)
+    "t_vsyo_aa", # arte y aficiones (s31, s32)
+    "t_vsyo_dep", # deporte o ejercicio fisico (s41)
+    "t_descanso", # descanso: no se pregunta en ENUT I, siempre 0 (ENUT II vs11)
     't_mcm_leer',
     't_mcm_video',
     't_mcm_audio',
@@ -37,6 +40,7 @@ acts_corregidas <- c(
     "t_tt1" # traslados enut 2015
   )
 
+# Same aggregated structure as enut-ii.
 t_agregados <- c(
   "t_paid_work",
   "t_job_search",
@@ -45,19 +49,23 @@ t_agregados <- c(
   "t_unpaid_voluntary",
   "t_education",
   "t_leisure",
+  "t_rest",
   "t_personal_care",
   "t_meals",
   "t_sleep",
-  "t_commute1")
+  "t_commute")
 
 t_agregados_new <- c(
   "Tw",
   "Tf_social",
+  "Tf_events",
   "Tf_hobbies",
+  "Tf_sports",
   "Tf_read",
   "Tf_listen",
   "Tf_watch",
   "Tf_computer",
+  "Tf_rest",
   "Tc_meals",
   "Tc_sleep",
   "Tc_other"
@@ -109,7 +117,9 @@ new_variables_prefilter<- function(data) { # OJO, DEBEN ENTRAR TODOS INDEPENDIEN
   # INFORMACIÓN DEL INDIVIDUO
   data <- data %>%
   mutate(
-    menor_edad        = case_when(c14_1_1 <= 18 ~ 1, TRUE ~ 0),
+    # under 18; with <= 18 the 18 year olds were also counted in n_mayores,
+    # so n_personas = n_menores_18 + n_mayores counted them twice
+    menor_edad        = case_when(c14_1_1 < 18 ~ 1, TRUE ~ 0),
     menor_0_4         = case_when(c14_1_1 < 5 ~ 1, TRUE ~ 0),
     menor_0_14        = case_when(c14_1_1 < 15 ~ 1, TRUE ~ 0),
     menor_5_14        = case_when(c14_1_1 >= 5 & c14_1_1 <= 14 ~ 1, TRUE ~ 0),
@@ -144,7 +154,8 @@ new_variables_prefilter<- function(data) { # OJO, DEBEN ENTRAR TODOS INDEPENDIEN
            n_trabajadores = sum(trabaja),
            n_profesionales = sum(nivel_escolaridad >=4 ),
            edad_promedio = mean(c14_1_1)) %>%
-    mutate(hay_tercera_edad = case_when(n_tercera_edad > 1 ~ 1 & tercera_edad == 0,  T ~ 0),
+    # at least one member aged 60+ other than the respondent
+    mutate(hay_tercera_edad = case_when(n_tercera_edad - tercera_edad >= 1 ~ 1, T ~ 0),
            n_personas = n_menores_18 + n_mayores) %>%
     ungroup()
 
@@ -237,7 +248,7 @@ outlier_detection_Vallejo <- function(data)  {
       t_total_ds  < lower_limit_ds  | t_total_ds  > upper_limit_ds  ~ FALSE,
       t_total_fds < lower_limit_fds | t_total_fds > upper_limit_fds ~ FALSE,
       TRUE ~ TRUE)) %>%
-    filter(dias_normal == TRUE) %>%
+    filter(dias_normal == TRUE)
 
   return(data)
 }
@@ -336,8 +347,12 @@ get_25activities <- function(data) {
   act_t_ed <- c("r11", "r21", "r22")
 
   # ocio
-  act_t_vsyo_csar <- act_ocio_social <- c("s11", "s21", "s22", "s23") # social y eventos pueden ser mezclables
-  act_t_vsyo_aa <- c("s31", "s32", "s41")
+  # Same split as the INE ENUT II aggregates: t_vsyo_csar = vs1 + vs3,
+  # events vs2, t_vsyo_aa = vs4 + vs5, sports vs6.
+  act_t_vsyo_csar <- c("s11", "s22") # conversar con amigos o familiares, celebraciones civicas o religiosas
+  act_t_vsyo_ev <- c("s21", "s23") # cine, teatro, concierto; evento deportivo o estadio
+  act_t_vsyo_aa <- c("s31", "s32") # instrumento, baile, escritura; juegos de mesa o videojuegos
+  act_t_vsyo_dep <- c("s41") # deporte o ejercicio fisico
 
   act_t_mcm_leer       <- c("s51")
   act_t_mcm_video      <- c("s52")
@@ -372,7 +387,10 @@ get_25activities <- function(data) {
       t_tvaoh_oh_ds = dplyr::select(., paste0(act_t_tvaoh_oh, "_1_2")) %>% rowSums(na.rm = T),
       t_ed_ds = dplyr::select(., paste0(act_t_ed, "_1_2")) %>% rowSums(na.rm = T),
       t_vsyo_csar_ds = dplyr::select(., paste0(act_t_vsyo_csar, "_1_2")) %>% rowSums(na.rm = T),
+      t_vsyo_ev_ds = dplyr::select(., paste0(act_t_vsyo_ev, "_1_2")) %>% rowSums(na.rm = T),
       t_vsyo_aa_ds = dplyr::select(., paste0(act_t_vsyo_aa, "_1_2")) %>% rowSums(na.rm = T),
+      t_vsyo_dep_ds = dplyr::select(., paste0(act_t_vsyo_dep, "_1_2")) %>% rowSums(na.rm = T),
+      t_descanso_ds = 0,
       t_mcm_leer_ds = dplyr::select(., paste0(act_t_mcm_leer, "_1_2")) %>% rowSums(na.rm = T),
       t_mcm_video_ds = dplyr::select(., paste0(act_t_mcm_video, "_1_2")) %>% rowSums(na.rm = T),
       t_mcm_audio_ds = dplyr::select(., paste0(act_t_mcm_audio, "_1_2")) %>% rowSums(na.rm = T),
@@ -398,7 +416,10 @@ get_25activities <- function(data) {
       t_tvaoh_oh_fds = dplyr::select(., paste0(act_t_tvaoh_oh, "_2_2")) %>% rowSums(na.rm = T),
       t_ed_fds = dplyr::select(., paste0(act_t_ed, "_2_2")) %>% rowSums(na.rm = T),
       t_vsyo_csar_fds = dplyr::select(., paste0(act_t_vsyo_csar, "_2_2")) %>% rowSums(na.rm = T),
+      t_vsyo_ev_fds = dplyr::select(., paste0(act_t_vsyo_ev, "_2_2")) %>% rowSums(na.rm = T),
       t_vsyo_aa_fds = dplyr::select(., paste0(act_t_vsyo_aa, "_2_2")) %>% rowSums(na.rm = T),
+      t_vsyo_dep_fds = dplyr::select(., paste0(act_t_vsyo_dep, "_2_2")) %>% rowSums(na.rm = T),
+      t_descanso_fds = 0,
       t_mcm_leer_fds = dplyr::select(., paste0(act_t_mcm_leer, "_2_2")) %>% rowSums(na.rm = T),
       t_mcm_video_fds = dplyr::select(., paste0(act_t_mcm_video, "_2_2")) %>% rowSums(na.rm = T),
       t_mcm_audio_fds = dplyr::select(., paste0(act_t_mcm_audio, "_2_2")) %>% rowSums(na.rm = T),
@@ -433,6 +454,13 @@ data_to168hours <- function(data) {
 
 
 impute_weekend <- function(data, twin_matrix) {
+  twin_matrix <- as.matrix(twin_matrix)
+  # the twin matrix is indexed by the rows of the pre weekend file; a stale
+  # matrix from another run would silently misalign the weekend imputation
+  if (nrow(twin_matrix) != nrow(data) || ncol(twin_matrix) != nrow(data)) {
+    stop("twin_matrix dimensions (", nrow(twin_matrix), " x ", ncol(twin_matrix),
+         ") do not match data rows (", nrow(data), "); rebuild it with gemelos_matriz.py")
+  }
 
   acts <- list(
     "6" = paste0(acts_corregidas, "_sab"),
@@ -525,11 +553,14 @@ agregar_actividades <- function(data_post) {
     mutate(
       Tw = t_to,
       Tf_social = t_vsyo_csar,
+      Tf_events = t_vsyo_ev,
       Tf_hobbies = t_vsyo_aa,
+      Tf_sports = t_vsyo_dep,
       Tf_read = t_mcm_leer,
       Tf_listen = t_mcm_audio,
       Tf_watch = t_mcm_video,
       Tf_computer = t_mcm_computador,
+      Tf_rest = t_descanso,
       Tc_meals = t_cpag_comer,
       Tc_sleep = t_cpag_dormir,
       Tc_other = dplyr::select(., c(
@@ -549,11 +580,12 @@ agregar_actividades <- function(data_post) {
         rowSums(na.rm = TRUE),  # commited/free
       t_unpaid_voluntary = t_tvaoh_tv + t_tvaoh_oh, # free
       t_education = t_ed, # committed / free
-      t_leisure = t_vsyo_csar + t_vsyo_aa + t_mcm_leer + t_mcm_video + t_mcm_audio + t_mcm_computador, # free
+      t_leisure = t_vsyo_csar + t_vsyo_ev + t_vsyo_aa + t_vsyo_dep + t_mcm_leer + t_mcm_video + t_mcm_audio + t_mcm_computador, # free
+      t_rest = t_descanso, # not collected in ENUT I
       t_personal_care = t_cpaf_cp, #committed/free
       t_meals         = t_cpag_comer, #committed/free
       t_sleep = t_cpag_dormir, #committed/free
-      t_commute1 = t_tt1)  # committed
+      t_commute = t_tt1)  # committed
 
   data_post <- data_post %>%
     mutate(
@@ -596,11 +628,18 @@ agregar_actividades <- function(data_post) {
   mutate(t_total = dplyr::select(., all_of(t_agregados)) %>% rowSums(na.rm = TRUE))
 
   data11[, c(t_agregados, t_agregados_new)] <- round(data11[, c(t_agregados, t_agregados_new)], 2)
-  data11[, "temp"] <- rowSums(data11[, t_agregados])
-  data11[, "t_sleep"]   <- data11[, "t_sleep"]   - (data11[, "temp"] - 168)
-  data11[, "Tc_sleep"]  <- data11[, "Tc_sleep"]  - (data11[, "temp"] - 168)
-  data11[, "temp"] <- rowSums(data11[, t_agregados])
-  data11 <- data11 %>% dplyr::select(-c("temp"))
+  # Sleep absorbs the rounding residual of each classification separately.
+  data11[, "t_sleep"]  <- data11[, "t_sleep"]  - (rowSums(data11[, t_agregados]) - 168)
+  data11[, "Tc_sleep"] <- data11[, "Tc_sleep"] - (rowSums(data11[, t_agregados_new]) - 168)
+  data11[, "t_total"] <- rowSums(data11[, t_agregados])
+
+  check_168 <- function(df, cols, label) {
+    gap <- max(abs(rowSums(df[, cols]) - 168))
+    if (gap > 1e-6) stop(label, " does not add up to 168 hours (max gap ", gap, ")")
+  }
+  check_168(data25, acts_corregidas, "enut-i-raw activities")
+  check_168(data11, t_agregados, "enut-i aggregated classification")
+  check_168(data11, t_agregados_new, "enut-i Tw/Tf/Tc classification")
 
   return(list(data25 = data25, data11 = data11))
 }
@@ -793,6 +832,9 @@ rename_to_english_raw <- function(data) {
     t_education              = "t_ed",
     t_leisure_social         = "t_vsyo_csar",
     t_leisure_hobbies        = "t_vsyo_aa",
+    t_leisure_events         = "t_vsyo_ev",
+    t_leisure_sports         = "t_vsyo_dep",
+    t_rest                   = "t_descanso",
     t_media_reading          = "t_mcm_leer",
     t_media_audio            = "t_mcm_audio",
     t_media_video            = "t_mcm_video",
