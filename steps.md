@@ -18,7 +18,7 @@ Below is the complete step-by-step workflow required to process the data from ab
 - **What it does**: This loads the freshly minted `ENUT_PRE_WEEKEND_IMPUTATION.csv` file into Python. Using multiprocessing and convex optimization (`cvxpy` + `ECOS` solvers), it finds comparable individuals and calculates the optimal weights for twin matching based heavily on Mahalanobis/Covariance distances.
 - **Why do it now**: Because it mathematically calculates the missing proxy variables required for imputing weekend time allocations.
 - The script writes `data/raw/matriz_gemelos.csv.gzip`, the file `data_processing.R` reads. Set `TWIN_WORKERS` to limit the number of processes (default: all cores).
-- The `fix-processing` changes leave the pre weekend rows and the twin covariates unchanged (10,597 rows, checked), so the existing matrix can be reused and this step skipped.
+- The shared structure fixes (`CHANGES.md`) leave the pre weekend rows and the twin covariates unchanged (10,597 rows, checked), so the existing matrix can be reused and this step skipped.
 
 ### 4. Complete the Pipeline
 **Script to run:** `Rscript data_processing/data_processing.R` (full run; it repeats the cheap step 2 and then reads the twin matrix)

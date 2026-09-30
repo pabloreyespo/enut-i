@@ -1,6 +1,6 @@
 # ENUT-I Pipeline Changes
 
-## Shared activity structure with ENUT-II (branch `fix-processing`)
+## Shared activity structure with ENUT-II
 
 `enut-i` and `enut-ii` now produce the same aggregated activity variables, so
 models can be estimated on both surveys with the same code.

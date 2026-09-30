@@ -14,7 +14,7 @@
 
 # Full ENUT-I pipeline (steps.md, steps 2 to 4). The expenditure models
 # (step 1, run_expenditures.bash) do not need to be rerun.
-# The fix-processing changes keep the pre weekend rows and the twin
+# The shared structure fixes keep the pre weekend rows and the twin
 # covariates, so the existing twin matrix is reused. Submit with
 #   sbatch --export=ALL,RUN_TWINS=1 enut-i/run_pipeline.bash
 # to rebuild it anyway (or when data/raw/matriz_gemelos.csv.gzip is missing).
