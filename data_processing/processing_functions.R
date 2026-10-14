@@ -103,6 +103,7 @@ sociodemograficas <- c("sexo",
                        "quintil",
                        "macrozona",
                        "region",
+                       "cut",
                        "prop_ing_hogar")
 laborales <- c("cae", "cise", "ciuo_agrupada")
 proveedores_externos <- c("servicio_domestico", "ayuda_cercanos", "fuentes_externas")
@@ -176,20 +177,51 @@ new_variables_prefilter<- function(data) { # OJO, DEBEN ENTRAR TODOS INDEPENDIEN
     # filter(tiempo == 1) %>% # será relevante desaserme de las personas que no declaran tiempo antes?
     mutate_at(c("ing_ocuppal", "ing_trab", "ing_jub_aps", "ing_g", "ing_mon", "ing_mon_pc"),
               ~replace_na(.,0)) %>%
-    mutate(ingresos_propios =  ing_trab + ing_jub_aps) %>%
-    group_by(id_hogar) %>%
-    mutate(prop_ingresos = ingresos_propios / sum(ingresos_propios)) %>%
-    mutate(ingreso_hogar = sum(ingresos_propios) + sum(ing_g)) %>%
-    mutate(ing_gpp = sum(ing_g) * prop_ingresos) %>%
-    mutate(income_person_week = (sum(ingresos_propios) + ing_gpp) / n()) %>% ungroup() %>%
-    mutate(ingreso_personal = ing_trab + ing_jub_aps + ing_gpp) %>%
-    group_by(id_hogar) %>% mutate(prop_ing_hogar = ingreso_personal / sum(ingreso_personal))%>%
-    ungroup() %>%
+    # ing_g comes from the household questionnaire: ENUT 2015 has no rent or child support item per
+    # person, so it is split by own income, or among members aged 15+ if nobody has own income
+    repartir_ingreso(hogar = "id_hogar", edad = "c14_1_1") %>%
     mutate_at(c("prop_ing_hogar", "ingreso_hogar", "ing_gpp", "income_person_week", "ingreso_personal"),
               ~replace_na(.,0)) %>%
     mutate(I = ing_jub_aps + ing_g)
   return(data)
 }
+
+# Splits household income among members. Own income = labor + pension + ing_otros. The household
+# residual ing_g (ing_t_hogar minus own income, or the one the survey provides) goes in proportion
+# to own income; if nobody in the household has own income, in equal parts among members aged 15+
+# (everyone if there are none). ing_gpp = ing_otros + the residual share, so
+# ingreso_personal = ing_trab + ing_jub_aps + ing_gpp adds up to the household income.
+repartir_ingreso <- function(data, hogar, edad) {
+  if (!"ing_otros" %in% names(data)) data$ing_otros <- 0
+  data <- data %>%
+    mutate(
+      ingresos_propios = ing_trab + ing_jub_aps + ing_otros,
+      .adulto = as.numeric(coalesce(.data[[edad]] >= 15, FALSE))
+    ) %>%
+    group_by(across(all_of(hogar)))
+  if (!"ing_g" %in% names(data)) {
+    data <- data %>% mutate(ing_g = (sum(ing_t_hogar) - sum(ingresos_propios)) * (ing_t_hogar > 0))
+  }
+  data %>%
+    mutate(
+      .s_prop = sum(ingresos_propios),
+      .s_g = sum(ing_g),
+      .n_adultos = sum(.adulto),
+      .peso = case_when(
+        .s_prop > 0 ~ ingresos_propios / .s_prop,
+        .n_adultos > 0 ~ .adulto / .n_adultos,
+        TRUE ~ 1 / n()
+      ),
+      ingreso_hogar = .s_prop + .s_g,
+      ing_gpp = ing_otros + .s_g * .peso,
+      income_person_week = (sum(ing_trab) + sum(ing_jub_aps) + ing_gpp) / n(),
+      ingreso_personal = ing_trab + ing_jub_aps + ing_gpp,
+      prop_ing_hogar = if (sum(ingreso_personal) > 0) ingreso_personal / sum(ingreso_personal) else 0
+    ) %>%
+    ungroup() %>%
+    dplyr::select(-c(.adulto, .s_prop, .s_g, .n_adultos, .peso))
+}
+
 
 na_completion <- function(data) {
   act_traslados_ds <- c("m12_1_1", "m12_1_2", "q18_1_1", "q18_1_2", "r12_1_1", "r12_1_2")
@@ -261,6 +293,8 @@ new_variables_postfilter <- function(data) {
     mutate(horas_trabajo_contratadas = case_when(k31_1_3 > 0 ~ k31_1_3, T ~ 0),
            horas_trabajo_habituales  = case_when(k31_1_1 > 0 ~ k31_1_1, T ~ 0),
            dias_trabajo_semana       = case_when(k31_1_2 > 0 ~ k31_1_2, T ~ 0),
+           # comuna (CUT 2015, before Nuble: Chillan is 8401): VarStrat is the CUT times 100
+           cut = as.integer(VarStrat %/% 100),
            macrozona = case_when(region <= 5 | region == 15 ~ "norte",
                                  region ==13 ~ "metropolitana",
                                  region <= 8 & region > 5 ~ "centro",
@@ -649,6 +683,60 @@ agregar_actividades <- function(data_post) {
 #   summarise(cuantos = n())
 #######
 
+# Imputacion JDI (hot-deck por celdas inspirado en Hawkins y Habib 2022, como en enut-ii y
+# enut-bigcities): cada hogar ENUT recibe el promedio de (10 divisiones, savings) / ingreso del hogar
+# de m hogares EPF sorteados de su celda, con m = integrantes de 15 anios o mas. Esas razones suman 1,
+# asi que ahorro y gasto salen de los mismos donantes. La EPF VIII solo identifica la zona (Gran
+# Santiago o resto de capitales regionales), sin comuna, estrato ni NSE, por lo que las celdas son las
+# de Hawkins, de la mas fina a la mas gruesa (la primera con al menos `min_donantes` hogares EPF):
+#   1. zona x quintil x tamanio del hogar (1 a 5+);  2. zona x quintil;  3. quintil.
+imputar_jdi <- function(data_hogar, gastos, min_donantes = 10, semilla = 2023) {
+  set.seed(semilla)
+  razones <- as.matrix(gastos[, c(paste0("g.", alts), "savings")]) / gastos$ingreso_hogar
+  colnames(razones) <- c(alts, "savings")
+  tam_epf <- pmin(gastos$n_personas, 5)
+  zona <- ifelse(data_hogar$macrozona == "metropolitana", "metropolitana", "regiones")
+  tam <- pmin(data_hogar$n_personas, 5)
+  n_15_mas <- data_hogar$n_personas - data_hogar$n_menores_0_4 - data_hogar$n_menores_5_14
+  clave <- paste(zona, data_hogar$quintil, tam)
+
+  R <- matrix(NA_real_, nrow(data_hogar), ncol(razones), dimnames = list(NULL, colnames(razones)))
+  nivel <- rep(NA_character_, nrow(data_hogar))
+  for (k in unique(clave)) {
+    filas <- which(clave == k)
+    i1 <- filas[1]
+    q <- gastos$quintil == data_hogar$quintil[i1]
+    celdas <- list(
+      "zona x quintil x tamanio" = q & gastos$macrozona == zona[i1] & tam_epf == tam[i1],
+      "zona x quintil" = q & gastos$macrozona == zona[i1],
+      "quintil" = q
+    )
+    for (n in names(celdas)) {
+      idx <- which(celdas[[n]] %in% TRUE)
+      if (length(idx) >= min_donantes) break
+    }
+    if (length(idx) == 0) next # sin quintil: queda NA, como en el FMNL
+    for (i in filas) {
+      m <- max(1, n_15_mas[i])
+      R[i, ] <- colMeans(razones[idx[sample.int(length(idx), m, replace = TRUE)], , drop = FALSE])
+    }
+    nivel[filas] <- n
+  }
+  print(table(nivel, useNA = "ifany"))
+  R
+}
+
+# Ef1, Ef2 y Ec (las grandes categorias de utils.R) desde montos de las 10 divisiones.
+agregar_categorias <- function(M, sufijo) {
+  out <- data.frame(
+    rowSums(M[, c("alimentos", "recreacion", "restaurantes", "comunicaciones"), drop = FALSE]),
+    M[, "vestimenta"],
+    rowSums(M[, c("cuentas", "hogar", "salud", "transporte", "educacion"), drop = FALSE])
+  )
+  names(out) <- paste0(c("Ef1", "Ef2", "Ec"), sufijo)
+  out
+}
+
 imputacion_gastos <- function(data) {
   library("minpack.lm")
   data_hogar <- data %>%
@@ -719,14 +807,28 @@ imputacion_gastos <- function(data) {
   apollo_fixed <<- model$apollo_fixed
   apollo_inputs <<- apollo_validateInputs()
   predictions_base <<- apollo_prediction(model,apollo_probabilities,apollo_inputs)
-  data_hogar[,alts] = predictions_base[,alts]
-  data_hogar[,alts] = sweep(data_hogar[,alts], 1, unlist(data_hogar[,"ingreso_hogar"] - data_hogar[,"savings"]), "*")
+  # las 10 divisiones sin sufijo siguen siendo las del FMNL con el ahorro de la regresion; las columnas
+  # _fmnl son esas mismas en Ef1/Ef2/Ec/savings y las _jdi salen de los donantes (imputar_jdi)
+  fmnl <- as.matrix(predictions_base[, alts]) * (data_hogar$ingreso_hogar - data_hogar$savings)
+  data_hogar[, alts] <- fmnl
+  jdi <- imputar_jdi(data_hogar, gastos) * data_hogar$ingreso_hogar
+  ok <- !is.na(jdi[, 1])
+  stopifnot(isTRUE(all.equal(rowSums(jdi[ok, ]), data_hogar$ingreso_hogar[ok], check.attributes = FALSE)))
+  sufijos <- c(
+    paste0(c("Ef1", "Ef2", "Ec", "savings"), "_jdi"),
+    paste0(c("Ef1", "Ef2", "Ec", "savings"), "_fmnl")
+  )
+  data_hogar <- cbind(
+    data_hogar,
+    agregar_categorias(jdi, "_jdi"), savings_jdi = jdi[, "savings"],
+    agregar_categorias(fmnl, "_fmnl"), savings_fmnl = data_hogar$savings
+  )
 
-  data <- merge(data, data_hogar[,c("id_hogar", "savings", alts)], by = "id_hogar", all.x = TRUE)
-  data[,c("savings", alts)] = sweep(data[,c("savings", alts)], 1, unlist(data[,"prop_ing_hogar"]), "*")
+  data <- merge(data, data_hogar[,c("id_hogar", "savings", alts, sufijos)], by = "id_hogar", all.x = TRUE)
+  data[,c("savings", alts, sufijos)] = sweep(data[,c("savings", alts, sufijos)], 1, unlist(data[,"prop_ing_hogar"]), "*")
   data[,"total_expenses"] = data[,"ing_personal"] - data["savings"]
 
-  data[,alts] = round(data[,alts], 2)
+  data[,c(alts, sufijos)] = round(data[,c(alts, sufijos)], 2)
 
   #ingresos     <- c("ing_ocuppal", "ing_trab", "ing_jub_aps", "ing_g", "ing_mon", "ing_mon_pc", "ing_gpp", "ing_personal", "income_person_week")
   # data[, ingresos] = data[, ingresos] * 1000
@@ -782,6 +884,7 @@ imputacion_gastos <- function(data) {
   quintile             = "quintil",
   macrozone            = "macrozona",
   region               = "region",
+  comuna_code          = "cut",
   income_share         = "prop_ing_hogar",
   # labor
   employment_status    = "cae",

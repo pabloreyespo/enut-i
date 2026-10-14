@@ -70,7 +70,7 @@
 #'   \item{ing_g}{Imputed group income component from household total (weekly, thousands CLP)}
 #'   \item{ing_mon}{Monetary transfers and other non-labor income (weekly, thousands CLP)}
 #'   \item{ing_mon_pc}{Per capita monetary income (weekly, thousands CLP)}
-#'   \item{ing_gpp}{Individual share of group income (weekly, thousands CLP)}
+#'   \item{ing_gpp}{Share of household questionnaire income (ing_g), by own income or equally among members aged 15+ when nobody has own income (weekly, thousands CLP)}
 #'   \item{ing_personal}{Personal income: ing_trab + ing_jub_aps + ing_gpp (weekly, thousands CLP)}
 #'   \item{ingreso_hogar}{Total household disposable income (weekly, thousands CLP)}
 #'   \item{income_person_week}{Household income divided by number of members (weekly, thousands CLP)}

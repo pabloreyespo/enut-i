@@ -69,7 +69,7 @@
 #'   \item{ing_g}{Imputed group income component from household total}
 #'   \item{ing_mon}{Monetary transfers and other non-labor income}
 #'   \item{ing_mon_pc}{Per capita monetary income}
-#'   \item{ing_gpp}{Individual share of group income}
+#'   \item{ing_gpp}{Share of household questionnaire income (ing_g), by own income or equally among members aged 15+ when nobody has own income}
 #'   \item{ing_personal}{Personal income}
 #'   \item{ingreso_hogar}{Total household disposable income}
 #'   \item{income_person_week}{Household income divided by number of members}

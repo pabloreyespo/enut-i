@@ -14,10 +14,10 @@
 
 # Full ENUT-I pipeline (steps.md, steps 2 to 4). The expenditure models
 # (step 1, run_expenditures.bash) do not need to be rerun.
-# The shared structure fixes keep the pre weekend rows and the twin
-# covariates, so the existing twin matrix is reused. Submit with
+# The existing twin matrix (2025-04-06) predates the current twin
+# covariates (CHANGES.md), so rebuild it: submit with
 #   sbatch --export=ALL,RUN_TWINS=1 enut-i/run_pipeline.bash
-# to rebuild it anyway (or when data/raw/matriz_gemelos.csv.gzip is missing).
+# (it is also rebuilt when data/raw/matriz_gemelos.csv.gzip is missing).
 set -e
 cd enut-i
 
@@ -31,6 +31,7 @@ if [ "${RUN_TWINS:-0}" = "1" ] || [ ! -f data/raw/matriz_gemelos.csv.gzip ]; the
   ml intel/2022.00
   ml Python/3.12.3
   source enut-env/bin/activate
+  export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
   TWIN_WORKERS=${SLURM_CPUS_PER_TASK:-10} python data_processing/gemelos_matriz.py
   deactivate
   ml purge

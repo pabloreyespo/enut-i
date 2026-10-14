@@ -21,4 +21,6 @@ ml Python/3.12.3
 
 cd enut-i
 source enut-env/bin/activate
-python data_processing/gemelos_matriz.py
+# one BLAS thread per worker, one worker per allocated core
+export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
+TWIN_WORKERS=${SLURM_CPUS_PER_TASK:-10} python data_processing/gemelos_matriz.py
