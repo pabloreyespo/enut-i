@@ -21,6 +21,7 @@ set -e
 cd enut-i
 
 # ---------------- Step 2: pre weekend file ----------------
+ml intel/2022.00  # rlang in the user library links libimf.so (Intel runtime)
 module load r/4.4.0
 Rscript data_processing/data_processing.R --pre
 
@@ -34,6 +35,7 @@ if [ "${SKIP_TWINS:-0}" != "1" ] || [ ! -f data/raw/matriz_gemelos.csv.gzip ]; t
   TWIN_WORKERS=${SLURM_CPUS_PER_TASK:-10} python data_processing/gemelos_matriz.py
   deactivate
   ml purge
+  ml intel/2022.00
   module load r/4.4.0
 fi
 
