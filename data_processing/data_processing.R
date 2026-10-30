@@ -74,6 +74,7 @@ rm(twin_matrix)
 data_post <- diagnostico_trabajo(data_post, F, T)
 data_post <- adjust_working_hours(data_post)
 data_post <- data_to168hours(data_post) # TODO probar distintos posicionamientos
+data_post <- filtrar_salarios_extremos(data_post, k = 3) # wage-rate outliers, w = ing_trab / t_to
 
 ### Continuar con la imputación de gastos, está la opción de usar fractional logit para imputar los gastos
 #aux <- data_post %>% filter(ing_trab > 0, tt > 0, trabaja == 1) %>%

@@ -14,10 +14,9 @@
 
 # Full ENUT-I pipeline (steps.md, steps 2 to 4). The expenditure models
 # (step 1, run_expenditures.bash) do not need to be rerun.
-# The existing twin matrix (2025-04-06) predates the current twin
-# covariates (CHANGES.md), so rebuild it: submit with
-#   sbatch --export=ALL,RUN_TWINS=1 enut-i/run_pipeline.bash
-# (it is also rebuilt when data/raw/matriz_gemelos.csv.gzip is missing).
+# The twin matrix is always rebuilt (the existing one predates the current
+# twin covariates and the pre weekend file). To reuse the existing matrix
+# instead: sbatch --export=ALL,SKIP_TWINS=1 enut-i/run_pipeline.bash
 set -e
 cd enut-i
 
@@ -25,8 +24,8 @@ cd enut-i
 module load r/4.4.0
 Rscript data_processing/data_processing.R --pre
 
-# ---------------- Step 3: twin matrix (optional) ----------------
-if [ "${RUN_TWINS:-0}" = "1" ] || [ ! -f data/raw/matriz_gemelos.csv.gzip ]; then
+# ---------------- Step 3: twin matrix ----------------
+if [ "${SKIP_TWINS:-0}" != "1" ] || [ ! -f data/raw/matriz_gemelos.csv.gzip ]; then
   ml purge
   ml intel/2022.00
   ml Python/3.12.3

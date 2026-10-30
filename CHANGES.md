@@ -206,3 +206,42 @@ questionnaire. It is still split in proportion to labor and pension income, but 
 household has own income it is now split equally among members aged 15+. Before, `0/0` was replaced
 by 0 and the whole household income disappeared (254 households). `ingreso_hogar` and the quintiles do
 not change. Same function as `enut-ii`. Tests: `Rscript tests/test_ingresos.R`.
+
+## Patch of the published datasets (`data_processing/parche_gastos_jdi.R`)
+
+A full rerun of `data_processing.R` no longer reproduces the published datasets (the
+`diagnostico_trabajo` filter gives 9,497 rows instead of the published 9,412), so the new JDI
+draw is applied directly to the published files, without rerunning the pipeline:
+`Rscript data_processing/parche_gastos_jdi.R`. The script reads `data/enut-i.dta` and
+`data/enut-i-raw.dta`, rebuilds the household table (`quintil`, `macrozona`, `n_trabajadores`,
+`ingreso_hogar`, `n_15_mas` from the ages of the raw roster, and the household expansion factor
+`wgtH` from `BASE_USUARIO_corregida.dta`), calls `imputar_jdi()` with seed 2023 and recomputes only
+`Ef1_jdi`, `Ef2_jdi`, `Ec_jdi` and `savings_jdi` (ratios x `ingreso_hogar` x `prop_ing_hogar`,
+rounded to 2 decimals). All other columns and the 9,412 rows are unchanged (checked in the script);
+`n_15_mas` is added as column 20 when the published file lacks it. It rewrites
+the eight variants (raw, aggregated, `-ENG`; csv and dta) and `output/jdi_chi2.csv` and
+`output/jdi_nivel.csv`. The published csv keeps `Inf` in `w` (3 people), which the dta cannot store.
+
+Result on the 6,482 published households: IPF in 15 sweeps (error 4.6e-09, 0.01% of the mass
+without EPF support); 6,237 households use the full profile, 198 drop zone and 47 drop zone and
+workers. At person level the `_jdi` means go from 25.82, 2.77, 35.77, 5.50 (Ef1, Ef2, Ec, savings) to
+25.80, 2.64, 35.00, 6.43, and the SD from 38.8, 5.0, 67.0, 43.3 to 40.9, 5.0, 66.1, 41.4
+(correlation old/new 0.86, 0.59, 0.85, 0.33). The note above about 9,497 rows describes a rerun
+that is not the published data.
+
+## Wage-rate outlier filter (`filtrar_salarios_extremos()`)
+
+`data_processing.R` now drops extreme wage rates right after the time-use filters (Vallejo filter,
+weekend imputation, `diagnostico_trabajo`, `adjust_working_hours`, `data_to168hours`) and before
+`imputacion_gastos()`. The wage rate is `w = ing_trab / t_to`, the same definition used later for
+the published `w`, with `t_to` already adjusted to contracted hours at that point.
+
+* Among workers with a positive, finite `w`, rows whose `log(w)` lies outside
+  `[Q1 - k IQR, Q3 + k IQR]` are dropped. `k` is the named argument `k = 3`.
+* Rows without a positive `w` (non-workers) are kept untouched.
+* Rows before and after are printed, as `diagnostico_trabajo()` does.
+* Same rule as `drop_extreme_wages()` in the `mtuem-lc-activity-participation-py` project.
+* Tests: `Rscript tests/test_salarios.R`.
+* Indicative effect on the current published `enut-i.csv` (the real filter runs earlier, so the exact
+  counts will differ): 13 of 4631 workers dropped (5 low, 8 high); `w` range goes from 0.015 to 312.5 to 0.089 to 50.0.
+* Rerun the full pipeline (`sbatch run_pipeline.bash`) to apply it.

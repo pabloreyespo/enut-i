@@ -568,6 +568,26 @@ diagnostico_trabajo <- function(data, plots, intercuartil) {
   }
 }
 
+filtrar_salarios_extremos <- function(data, k = 3, ingreso = "ing_trab", horas = "t_to") {
+  # Among workers with a positive wage rate w = ingreso / horas, drops the rows whose
+  # log w lies outside [Q1 - k IQR, Q3 + k IQR]. Rows without a positive w are kept.
+  cat("Numero inicial de filas", nrow(data), "
+")
+  w <- data[[ingreso]] / data[[horas]]
+  con_salario <- is.finite(w) & w > 0
+  mantener <- !con_salario
+  if (any(con_salario)) {
+    log_w <- log(w[con_salario])
+    q <- quantile(log_w, c(0.25, 0.75), names = FALSE)
+    iqr <- q[2] - q[1]
+    mantener[con_salario] <- log_w >= q[1] - k * iqr & log_w <= q[2] + k * iqr
+  }
+  data <- data[mantener, ]
+  cat("Numero final de filas", nrow(data), "
+")
+  return(data)
+}
+
 adjust_working_hours <- function(data, normalize = TRUE) {
   act_ajustar <- acts_corregidas[!acts_corregidas %in% c("t_to")]
   data <- data %>% mutate(t_to = horas_trabajo_contratadas)
