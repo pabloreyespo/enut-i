@@ -933,7 +933,7 @@ imputar_jdi <- function(data_hogar, gastos, min_donantes = 10, semilla = 2023, a
   dims <- names(perf_epf)
 
   # clases de gasto: quintiles de ahorro/ingreso y de las participaciones Ec y Ef1
-  ef1 <- rowSums(gastos[, paste0("g.", c("alimentos", "recreacion", "restaurantes", "comunicaciones"))])
+  ef1 <- rowSums(gastos[, paste0("g.", c("recreacion", "restaurantes", "comunicaciones"))])
   ec <- rowSums(gastos[, paste0("g.", c("cuentas", "hogar", "salud", "transporte", "educacion"))])
   epf <- cbind(perf_epf, data.frame(
     c_ahorro = cuantiles_ponderados(gastos$savings / gastos$ingreso_hogar, gastos$fe),
@@ -967,14 +967,16 @@ imputar_jdi <- function(data_hogar, gastos, min_donantes = 10, semilla = 2023, a
   )
 }
 
-# Ef1, Ef2 y Ec (las grandes categorias de utils.R) desde montos de las 10 divisiones.
+# Ef0 (alimentos), Ef1, Ef2 y Ec (las grandes categorias de utils.R) desde montos de las 10 divisiones.
+# Ef1 incluye alcohol y tabaco porque ya estan plegados en recreacion (plegar_alcohol).
 agregar_categorias <- function(M, sufijo) {
   out <- data.frame(
-    rowSums(M[, c("alimentos", "recreacion", "restaurantes", "comunicaciones"), drop = FALSE]),
+    M[, "alimentos"],
+    rowSums(M[, c("recreacion", "restaurantes", "comunicaciones"), drop = FALSE]),
     M[, "vestimenta"],
     rowSums(M[, c("cuentas", "hogar", "salud", "transporte", "educacion"), drop = FALSE])
   )
-  names(out) <- paste0(c("Ef1", "Ef2", "Ec"), sufijo)
+  names(out) <- paste0(c("Ef0", "Ef1", "Ef2", "Ec"), sufijo)
   out
 }
 
@@ -1071,8 +1073,8 @@ imputacion_gastos <- function(data, metodo = "jdi", pesos = NULL) {
   ok <- !is.na(jdi[, 1])
   stopifnot(isTRUE(all.equal(rowSums(jdi[ok, ]), data_hogar$ingreso_hogar[ok], check.attributes = FALSE)))
   sufijos <- c(
-    paste0(c("Ef1", "Ef2", "Ec", "savings"), "_jdi"),
-    paste0(c("Ef1", "Ef2", "Ec", "savings"), "_fmnl")
+    paste0(c("Ef0", "Ef1", "Ef2", "Ec", "savings"), "_jdi"),
+    paste0(c("Ef0", "Ef1", "Ef2", "Ec", "savings"), "_fmnl")
   )
   data_hogar <- cbind(
     data_hogar,

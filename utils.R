@@ -70,7 +70,8 @@ get_data <- function(
   free_activities = list(Tw = c("t_to"),
                          Tfleisure = c("t_vsyo_csar", "t_vsyo_aa","t_mcm_leer", "t_mcm_audio", "t_mcm_video", "t_mcm_computador"),
                          Tfmeals = c("t_cpag_comer")),
-  free_expenditures = list(Ef1 = c("alimentos","recreacion","restaurantes","comunicaciones"),
+  free_expenditures = list(Ef0 = c("alimentos"),
+                           Ef1 = c("recreacion","restaurantes","comunicaciones"),
                            Ef2 = c("vestimenta")),
   baskets = FALSE
 ) {

@@ -17,7 +17,7 @@ options(dplyr.summarise.inform = FALSE)
 
 source("data_processing/processing_functions.R")
 
-sufijos_jdi <- paste0(c("Ef1", "Ef2", "Ec", "savings"), "_jdi")
+sufijos_jdi <- paste0(c("Ef0", "Ef1", "Ef2", "Ec", "savings"), "_jdi")
 # imputar_jdi() usa `alts` como global (lo define imputacion_gastos)
 alts <- c("alimentos", "vestimenta", "cuentas", "hogar", "salud", "transporte",
           "comunicaciones", "recreacion", "educacion", "restaurantes")

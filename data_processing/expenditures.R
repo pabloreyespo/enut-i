@@ -2,10 +2,9 @@ rm(list = ls())  # .rs.restartR()
 pkgs <- c("ggplot2", "dplyr", "tidyr", "readr", "purrr", "tibble", "stringr", "forcats", "lubridate", "haven", "reshape2","apollo")
 invisible(lapply(pkgs, library, character.only=TRUE))
 
-codigos <- c(g.alimentos = "01", g.vestimenta = "03",g.cuentas = "04", g.hogar = "05", g.salud = "06",
-             g.transporte = "07", g.comunicaciones = "08", g.recreacion = "09", g.educacion = "10", g.restaurantes = "11")
+source("data_processing/categorias_gasto.R")
 
-vector_gastos <- c("g.alimentos","g.vestimenta","g.cuentas","g.hogar",
+vector_gastos <- c("g.alimentos","g.alcohol_tabaco","g.vestimenta","g.cuentas","g.hogar",
                    "g.salud","g.transporte","g.comunicaciones","g.recreacion","g.educacion",
                    "g.restaurantes","total_expenses")
 
@@ -97,29 +96,18 @@ data_ingresos <- data_ingresos %>%
 data_gastos <- data_gastos %>%
   filter(CCIF!="04.2.1.01.01" & CCIF!="04.2.2.01.01" & CCIF!="04.2.2.01.02" & FOLIO!="") %>%
   drop_na(FOLIO) %>%
-  mutate(codigo = D ) %>% #paste(D,G, sep =".")) %>%
-  mutate(codigo = case_when(
-    D=="09" & G=="1" ~ "08",
-    D=="02"          ~ "01", # alcoho
-    D=="12" & G=="1" ~ "06",
-    D=="12" & G=="2" ~ "09",
-    D=="12" & G=="3" ~ "03",
-    D=="12" & G=="4" ~ "04",
-    D=="12" & G=="5" ~ "04",
-    D=="12" & G=="6" ~ "04",
-    D=="12" & G=="7" ~ "04",
-    D=="12" & G=="8" ~ "04",
-    T ~ codigo )) %>%
+  mutate(codigo = codigo_categoria(D, G)) %>%
   group_by(FOLIO, codigo) %>%
   summarise(monto_total = sum(GASTO)) %>%
   mutate(codigo = names(codigos)[match(codigo, codigos)]) %>%
   ungroup() %>%
   dcast(FOLIO ~ codigo, value.var="monto_total", fun.aggregate = sum) %>% dplyr::select(-c("NA")) %>%
-  mutate_at(names(codigos), ~replace_na(.,0))
+  mutate_at(names(codigos), ~replace_na(.,0)) %>%
+  plegar_alcohol()
 
 data_ambos <- merge(data_ingresos, data_gastos, "FOLIO") %>%
   arrange(FOLIO) %>%
-  mutate(total_expenses = dplyr::select(.,names(codigos)) %>% rowSums()) %>% # legal.discounts
+  mutate(total_expenses = dplyr::select(.,codigos_composicion) %>% rowSums()) %>% # legal.discounts
   mutate(savings = ingreso_hogar - total_expenses) %>%
 filter(total_expenses > 0 & ingreso_hogar > 0 ) # & EDAD > 0 & EDUE > 0 & EDUNIVEL>0
 
@@ -163,7 +151,7 @@ apollo_control <- list(
   nCores = 22)
 
 database <- gastos
-database[,names(codigos)] <- database[, names(codigos)] / rowSums(database[, names(codigos)])
+database[,codigos_composicion] <- database[, codigos_composicion] / rowSums(database[, codigos_composicion])
 
 apollo_beta <- c(asc_alimentos          = 0, bnpersonas_alimentos          = 0, bnmenores_0_4_alimentos = 0          , bnmenores_5_14_alimentos = 0          , bntrabajadores_alimentos = 0         , bnprofesionales_alimentos = 0          , bedadpromedio_alimentos = 0          , bq2_alimentos = 0          , bq3_alimentos = 0          , bq4_alimentos = 0          , bq5_alimentos = 0          , bmetro_alimentos = 0          ,
                  asc_vestimenta         = 0, bnpersonas_vestimenta         = 0, bnmenores_0_4_vestimenta = 0         , bnmenores_5_14_vestimenta = 0         , bntrabajadores_vestimenta = 0        , bnprofesionales_vestimenta = 0         , bedadpromedio_vestimenta = 0         , bq2_vestimenta = 0         , bq3_vestimenta = 0         , bq4_vestimenta = 0         , bq5_vestimenta = 0         , bmetro_vestimenta = 0         ,
