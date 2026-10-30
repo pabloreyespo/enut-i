@@ -73,14 +73,16 @@ data_ingresos <- data_ingresos %>%
                                percentil<= 0.40000001 ~2,
                                percentil<= 0.60000001 ~3,
                                percentil<= 0.80000001 ~4,
-                               T ~ 5 )) %>% dplyr::select(-c(percentil, FE)) %>%
+                               T ~ 5 )) %>% dplyr::select(-percentil) %>%
   group_by(FOLIO) %>%
-  summarise(n_menores_0_4          = sum( EDAD <= 4 ),
+  summarise(fe                     = first(FE), # factor de expansion del hogar (imputacion JDI)
+            n_15_mas               = sum( EDAD >= 15 ),
+            n_menores_0_4          = sum( EDAD <= 4 ),
             n_personas             = max(NPERSONAS),
             macrozona              = max(ZONA),
             n_menores_5_14         = sum( EDAD >= 5  & EDAD <= 14),
             n_personas_15_65       = sum( EDAD >= 15 & EDAD <= 65),
-            n_trabajadores         = sum( (INGDTD_HD + INGDTD_HD) > 0),
+            n_trabajadores         = sum( (INGDTD_HD + INGDTI_HD) > 0),
             income_person_week     = mean(ING_DISP_HOG_HD) / n(),
             edad_promedio          = mean(EDAD),
             n_profesionales        = sum(EDUNIVEL >= 14 & !(EDUNIVEL == 14 & EDUTERMINA == 2)),
@@ -126,7 +128,7 @@ filter(total_expenses > 0 & ingreso_hogar > 0 ) # & EDAD > 0 & EDUE > 0 & EDUNIV
 #data_ambos %>% group_by(quintil) %>% summarise(minim = min(ingreso_hogar))
 
 gastos <- data_ambos %>% mutate(id_hogar = 1:n()) %>%
-dplyr::select(FOLIO, id_hogar, all_of(vector_gastos), savings, n_personas, macrozona,
+dplyr::select(FOLIO, id_hogar, fe, n_15_mas, all_of(vector_gastos), savings, n_personas, macrozona,
                  quintil, n_menores_0_4, n_menores_5_14, n_trabajadores, edad_promedio,
                 n_profesionales, income_person_week, ingreso_hogar)
 
@@ -139,6 +141,9 @@ gastos <- gastos %>%
          n_trabajadores_cut  = case_when(n_trabajadores  >= 3 ~ 3, T ~ n_trabajadores),
          n_profesionales_cut = case_when(n_profesionales >= 2 ~ 3, T ~ n_profesionales))
 write.csv(gastos, "data/gastos.csv")
+# Rscript data_processing/expenditures.R --solo-datos se detiene aqui: la imputacion JDI
+# (imputacion_gastos(metodo = "jdi")) solo necesita data/gastos.csv, no el modelo FMNL.
+if ("--solo-datos" %in% commandArgs(trailingOnly = TRUE)) quit(save = "no")
 
 ########################################################################################################################
 ################                                 MODELOS                                                ################
