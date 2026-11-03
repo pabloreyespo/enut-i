@@ -245,3 +245,10 @@ the published `w`, with `t_to` already adjusted to contracted hours at that poin
 * Indicative effect on the current published `enut-i.csv` (the real filter runs earlier, so the exact
   counts will differ): 13 of 4631 workers dropped (5 low, 8 high); `w` range goes from 0.015 to 312.5 to 0.089 to 50.0.
 * Rerun the full pipeline (`sbatch run_pipeline.bash`) to apply it.
+
+## 11. Recommended imputation: `metodo = "jdi"`
+
+The recommended expenditure imputation is `imputacion_gastos(metodo = "jdi")`, which is the default of the
+pipeline. Its `_jdi` columns are the ones published. The cell hot-deck (`"hotdeck"`) is kept for comparison.
+The `_fmnl` columns (FMNL predictions) are no longer published: the FMNL is estimated only to compare the
+two methods, and its output files stay under `output/`.
